@@ -1,0 +1,82 @@
+name: jev
+version: 1.0.0
+description: >-
+  Hosted "System One" typed decisions (choice / score / boolean) with calibrated
+  probabilities via TypeSafe's Jev decision API — no LLM tokens spent on routing,
+  triage, gating, or moderation decisions. Zero dependencies (stdlib urllib
+  client). Settings adjustable live via /jev config and /jev set.
+author: pavlealeksic
+license: Apache-2.0
+kind: standalone
+provides_tools:
+  - jev_decide
+  - jev_status
+provides_context_engine:
+  - jev
+# Hooks register unconditionally and gate on live settings (routing_hint /
+# filter_output) at call time, so /jev set takes effect without a restart.
+provides_hooks:
+  - pre_llm_call
+  - transform_terminal_output
+  - transform_tool_result
+# Hermes prompts for this on install. The api_key_env setting can point at a
+# different variable (e.g. OPENROUTER_API_KEY for OpenRouter).
+requires_env:
+  - TYPESAFE_API_KEY
+config_schema:
+  base_url:
+    type: string
+    default: https://api.typesafe.ai/v1
+    description: "Decisions API base URL (https; http only for loopback/LAN)."
+  endpoint_path:
+    type: string
+    default: /systemone
+    description: "Decisions endpoint path (OpenRouter: /api/alpha/decisions)."
+  api_key_env:
+    type: string
+    default: TYPESAFE_API_KEY
+    description: "Name of the env var holding the API key (OpenRouter: OPENROUTER_API_KEY)."
+  jev_model:
+    type: string
+    default: jev-latest
+    description: "Model passed in each request (OpenRouter: typesafe/jev-1.13)."
+  request_timeout_s:
+    type: float
+    default: 30
+    description: "HTTP timeout per decision call, seconds."
+  routing_hint:
+    type: boolean
+    default: false
+    description: "pre_llm_call hook: inject a hint when Jev is confident a request is simple."
+  filter_output:
+    type: boolean
+    default: false
+    description: "Truncate large successful tool/terminal outputs Jev judges disposable."
+  filter_min_chars:
+    type: integer
+    default: 6000
+    description: "Minimum output size before filtering is considered."
+  keep_threshold:
+    type: float
+    default: 0.5
+    description: "Compaction: keep-probability at or above this keeps the unit."
+  error_keep_threshold:
+    type: float
+    default: 0.25
+    description: "Compaction: lower keep bar for error results."
+  min_result_chars:
+    type: integer
+    default: 2000
+    description: "Compaction: tool results smaller than this are never candidates."
+  result_excerpt_chars:
+    type: integer
+    default: 500
+    description: "Compaction: result head chars shown to Jev when judging a unit."
+  truncate_head_chars:
+    type: integer
+    default: 300
+    description: "Compaction: head kept when a result is truncated."
+  min_reduction_ratio:
+    type: float
+    default: 0.10
+    description: "Compaction: Jev pass must shrink the transcript by at least this, else the built-in prune runs."
