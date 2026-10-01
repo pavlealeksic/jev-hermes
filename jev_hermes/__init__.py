@@ -100,11 +100,17 @@ def register(ctx) -> None:
     )
     skill_path = Path(__file__).parent / "SKILL.md"
     if skill_path.exists():
-        ctx.register_skill(
-            "jev-decisions",
-            skill_path,
-            description="When and how to use the Jev API for fast typed decisions.",
-        )
+        # A context-engine collector (plugins/context_engine/_EngineCollector) does not
+        # implement register_skill, so this must never abort register(): it sits in the
+        # same body that registers the engine and the hooks.
+        try:
+            ctx.register_skill(
+                "jev-decisions",
+                skill_path,
+                description="When and how to use the Jev API for fast typed decisions.",
+            )
+        except AttributeError:
+            pass
     # Hooks register unconditionally and gate on live settings at call time, so
     # `/jev set routing_hint true` / `set filter_output true` take effect without
     # a restart. When disabled the callbacks return None immediately.

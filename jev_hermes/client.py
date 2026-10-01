@@ -228,6 +228,56 @@ def _build_body(model: str, state: Any, questions: Dict[str, Any]) -> bytes:
         ) from exc
 
 
+def _normalize_questions(questions: Dict[str, Any]) -> Dict[str, Any]:
+    """Coerce a question spec to the shape the live endpoint actually enforces.
+
+    The endpoint validates each question against a discriminated union and 400s
+    when a member is missing. Probing it directly established two rules that the
+    tool schema and the bundled skill do not state:
+
+      * ``instructions`` is REQUIRED for ``choice`` and ``score`` — without it the
+        request fails at ``path: [questions, <name>, instructions]``.
+      * ``choice.criteria`` must be a RECORD (``{label: description}``); a bare
+        array of labels is rejected with ``expected record, received array``,
+        and so is a plain string. ``score.criteria`` must be an ARRAY of levels
+        (a record is accepted and normalized to its keys).
+
+    Both repairs are applied here so callers following the documented "list or
+    mapping" wording do not 400. Anything genuinely malformed still raises.
+    """
+    for name, spec in (questions or {}).items():
+        if not isinstance(spec, dict):
+            continue
+        kind = str(spec.get("type") or "").strip().lower()
+        if kind in ("choice", "score"):
+            instructions = spec.get("instructions")
+            if not isinstance(instructions, str) or not instructions.strip():
+                raise ValueError(
+                    f"instructions is required for '{name}' (type {kind}): "
+                    "state what the model should decide between/among"
+                )
+        criteria = spec.get("criteria")
+        if criteria is None:
+            continue
+        if kind == "choice":
+            if isinstance(criteria, list):
+                if not all(isinstance(item, str) and item for item in criteria):
+                    raise ValueError(f"criteria for '{name}' must be a list of non-empty option labels")
+                spec["criteria"] = {item: item for item in criteria}
+            elif not isinstance(criteria, dict):
+                raise ValueError(
+                    f"criteria for '{name}' must be a mapping of option labels"
+                    " (a plain list of labels is normalized for you)"
+                )
+        elif kind == "score":
+            if isinstance(criteria, dict):
+                spec["criteria"] = list(criteria)
+            elif not isinstance(criteria, list) or not all(
+                    isinstance(item, str) and item for item in criteria):
+                raise ValueError(f"criteria for '{name}' must be an ordered list of levels")
+    return questions
+
+
 def _parse_response(status: int, text: str) -> Dict[str, Any]:
     if not 200 <= status < 300:
         # Upstream error bodies are attacker-influenced: report a category,
@@ -294,7 +344,7 @@ def predict(
         str(_config.get_value("base_url")), str(_config.get_value("endpoint_path"))
     )
     _check_url(url)  # fail closed before the key is attached to anything
-    body = _build_body(used_model, state, questions)
+    body = _build_body(used_model, state, _normalize_questions(questions))
     headers = {
         "Authorization": f"Bearer {_api_key()}",
         "Content-Type": "application/json",

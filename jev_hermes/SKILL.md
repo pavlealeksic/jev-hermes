@@ -34,9 +34,15 @@ If a task needs explanation, code, or long text — do that yourself; Jev only d
 
 ## Question types
 
-- `choice` — pick among labeled options; needs `criteria` (list or `{label: description}`).
+Both `choice` and `score` REQUIRE `instructions` — a short line saying what the
+model should decide. Omitting it makes the API reject the whole request with 400.
+
+- `choice` — pick among labeled options; `criteria` is a mapping
+  `{label: description}` describing each option (a plain list of labels is
+  normalized to that mapping for you).
 - `score` — ordinal rubric; `criteria` is the ordered list of levels (low → high).
-- `noul` — boolean; returns `P(true)`. `criteria` not needed.
+- `noul` — boolean; returns `P(true)`. Neither `criteria` nor `instructions`
+  is required.
 
 Multiple questions in one call are batched in a single request — ask everything
 at once.
