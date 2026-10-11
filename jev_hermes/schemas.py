@@ -22,7 +22,7 @@ DECIDE_SCHEMA = {
                 "type": "object",
                 "description": (
                     "Map of question name -> {type: choice|score|noul, instructions: string, "
-                    "criteria: [option labels] or {label: description}}. 'criteria' is required "
+                    "criteria: {label: description} for choice (a plain list of labels is accepted and mapped label->label), [ordered level labels] for score}. 'criteria' is required "
                     "for choice/score (the options or rubric levels), optional for noul. "
                     "Multiple questions are batched in one request."
                 ),

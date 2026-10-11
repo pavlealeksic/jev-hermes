@@ -215,7 +215,25 @@ _transport: Transport = _default_transport
 # -- request / response shaping ------------------------------------------------
 
 
+def _normalize_criteria(questions: Dict[str, Any]) -> Dict[str, Any]:
+    """TypeSafe's /systemone endpoint (verified 2026-10-11 against jev-1.13.0):
+    ``choice`` questions require ``criteria`` as a dict ``{label: description}``
+    and reject a bare list with HTTP 422; ``score`` questions require a list of
+    ordinal levels and reject a dict. Accept the list form for ``choice``
+    everywhere (tool calls, /jev slash command, presets) by mapping each label
+    to itself; leave ``score`` untouched."""
+    out: Dict[str, Any] = {}
+    for name, spec in questions.items():
+        if (isinstance(spec, dict) and spec.get("type") == "choice"
+                and isinstance(spec.get("criteria"), (list, tuple))):
+            spec = dict(spec)
+            spec["criteria"] = {str(c): str(c) for c in spec["criteria"]}
+        out[name] = spec
+    return out
+
+
 def _build_body(model: str, state: Any, questions: Dict[str, Any]) -> bytes:
+    questions = _normalize_criteria(questions)
     try:
         # allow_nan=False: NaN/Infinity are not valid JSON — a state carrying
         # them is corrupt input, not a request (strict endpoints 400 it).
